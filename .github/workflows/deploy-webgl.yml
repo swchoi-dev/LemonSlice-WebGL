@@ -23,7 +23,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      # 1. Release 정보 확인
       - name: Check GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,12 +34,11 @@ jobs:
           gh release list
 
           echo "Release information:"
-          gh release view webgl-v1.0.0
+          gh release view webgl-v1
 
           echo "Release assets:"
-          gh release view webgl-v1.0.0 --json assets
+          gh release view webgl-v1 --json assets
 
-      # 2. WebGL ZIP 다운로드
       - name: Download WebGL Build
         env:
           GH_TOKEN: ${{ github.token }}
@@ -48,14 +46,13 @@ jobs:
         run: |
           mkdir -p release
 
-          gh release download webgl-v1.0.0 \
+          gh release download webgl-v1 \
             --pattern "LemonSlice-WebGL-v1.0.0.zip" \
             --dir release
 
           echo "Downloaded files:"
           ls -lh release
 
-      # 3. ZIP 압축 해제
       - name: Extract WebGL Build
         run: |
           mkdir -p public
@@ -65,7 +62,6 @@ jobs:
           echo "Extracted files:"
           ls -lah public
 
-          # index.html 존재 확인
           if [ ! -f public/index.html ]; then
             echo "ERROR: index.html not found!"
             exit 1
@@ -73,22 +69,18 @@ jobs:
 
           echo "WebGL build verified."
 
-      # 4. GitHub Pages 설정
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      # 5. Pages 배포 아티팩트 업로드
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
-      # 6. GitHub Pages 배포
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # 7. 배포 URL 출력
       - name: Show Deployment URL
         run: |
           echo "Deployment completed."
