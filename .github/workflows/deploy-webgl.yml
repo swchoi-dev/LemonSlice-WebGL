@@ -29,14 +29,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           echo "Repository: $GH_REPO"
-
-          echo "Available releases:"
-          gh release list
-
-          echo "Release information:"
-          gh release view webgl-v1
-
-          echo "Release assets:"
           gh release view webgl-v1 --json assets
 
       - name: Download WebGL Build
@@ -50,24 +42,46 @@ jobs:
             --pattern "LemonSlice-WebGL-v1.0.0.zip" \
             --dir release
 
-          echo "Downloaded files:"
           ls -lh release
 
       - name: Extract WebGL Build
         run: |
-          mkdir -p public
+          python3 - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path, PurePosixPath
 
-          unzip -q release/LemonSlice-WebGL-v1.0.0.zip -d public
+          zip_path = "release/LemonSlice-WebGL-v1.0.0.zip"
+          output_dir = Path("public").resolve()
+          output_dir.mkdir(parents=True, exist_ok=True)
 
-          echo "Extracted files:"
-          ls -lah public
+          with zipfile.ZipFile(zip_path) as archive:
+              for entry in archive.infolist():
+                  name = entry.filename.replace("\\", "/")
+                  path = PurePosixPath(name)
 
-          if [ ! -f public/index.html ]; then
-            echo "ERROR: index.html not found!"
-            exit 1
-          fi
+                  if path.is_absolute() or ".." in path.parts:
+                      raise ValueError(f"Unsafe ZIP path: {name}")
 
-          echo "WebGL build verified."
+                  destination = output_dir.joinpath(*path.parts)
+
+                  if entry.is_dir() or name.endswith("/"):
+                      destination.mkdir(parents=True, exist_ok=True)
+                  else:
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+                      with archive.open(entry) as source:
+                          with destination.open("wb") as target:
+                              import shutil
+                              shutil.copyfileobj(source, target)
+
+          if not (output_dir / "index.html").is_file():
+              raise FileNotFoundError(
+                  "index.html not found at ZIP root"
+              )
+
+          print("WebGL build extracted successfully.")
+          print("Files:", os.listdir(output_dir))
+          PY
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
