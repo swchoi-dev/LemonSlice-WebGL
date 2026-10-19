@@ -15,41 +15,81 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    name: Deploy WebGL to GitHub Pages
+    runs-on: ubuntu-24.04
 
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Download WebGL release
+      # 1. Release 정보 확인
+      - name: Check GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "Repository: $GH_REPO"
+
+          echo "Available releases:"
+          gh release list
+
+          echo "Release information:"
+          gh release view webgl-v1.0.0
+
+          echo "Release assets:"
+          gh release view webgl-v1.0.0 --json assets
+
+      # 2. WebGL ZIP 다운로드
+      - name: Download WebGL Build
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           mkdir -p release
+
           gh release download webgl-v1.0.0 \
             --pattern "LemonSlice-WebGL-v1.0.0.zip" \
             --dir release
 
-      - name: Extract WebGL build
+          echo "Downloaded files:"
+          ls -lh release
+
+      # 3. ZIP 압축 해제
+      - name: Extract WebGL Build
         run: |
           mkdir -p public
+
           unzip -q release/LemonSlice-WebGL-v1.0.0.zip -d public
 
-          echo "WebGL build files:"
+          echo "Extracted files:"
           ls -lah public
 
-          test -f public/index.html
+          # index.html 존재 확인
+          if [ ! -f public/index.html ]; then
+            echo "ERROR: index.html not found!"
+            exit 1
+          fi
 
+          echo "WebGL build verified."
+
+      # 4. GitHub Pages 설정
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload Pages artifact
+      # 5. Pages 배포 아티팩트 업로드
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
 
+      # 6. GitHub Pages 배포
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # 7. 배포 URL 출력
+      - name: Show Deployment URL
+        run: |
+          echo "Deployment completed."
+          echo "URL: ${{ steps.deployment.outputs.page_url }}"
